@@ -1,27 +1,28 @@
 pub mod error;
-mod hash;
+pub mod hash;
 
 use hash::{hash, zero_hash};
 
 use bonsai::{children, expand, first_leaf, last_leaf, relative_depth, subtree_index_to_general};
-use std::collections::{BinaryHeap, HashMap, HashSet};
+use std::cmp::Reverse;
+use std::collections::{BTreeMap, BinaryHeap, HashSet};
 
 pub type K = u128;
 pub type V = [u8; 32];
 
 #[derive(Debug, Default, PartialEq)]
 pub struct Tree {
-    map: HashMap<K, V>,
+    map: BTreeMap<K, V>,
 }
 
 impl Tree {
     pub fn new() -> Self {
         Self {
-            map: HashMap::new(),
+            map: BTreeMap::new(),
         }
     }
 
-    pub fn from_map(map: HashMap<K, V>) -> Self {
+    pub fn from_map(map: BTreeMap<K, V>) -> Self {
         Self { map }
     }
 
@@ -34,17 +35,19 @@ impl Tree {
     }
 
     fn leaf_keys(&self, root: K, depth: u32) -> HashSet<K> {
-        (first_leaf(root, depth as u128)..last_leaf(root, depth as u128)).collect()
+        (first_leaf(root, depth as u128)..=last_leaf(root, depth as u128)).collect()
     }
 
     pub fn fill_subtree(&mut self, root: K, depth: u32, default: &V) {
-        let mut keys: BinaryHeap<u128> = self
+        let mut keys: BinaryHeap<Reverse<u128>> = self
             .keys()
             .intersection(&self.leaf_keys(root, depth))
             .cloned()
+            // mapping to reverse turn this into a min-heap
+            .map(Reverse)
             .collect();
 
-        while let Some(key) = keys.pop() {
+        while let Some(Reverse(key)) = keys.pop() {
             if key <= root {
                 break;
             }
@@ -52,29 +55,23 @@ impl Tree {
             let (left, right, parent) = expand(key);
 
             if !self.map.contains_key(&parent) {
-                let left = match self.map.get(&left) {
-                    Some(k) => *k,
-                    None => zero_hash(
+                let mut get_or_insert = |n: K| -> V {
+                    *self.map.entry(n).or_insert(zero_hash(
                         default,
-                        relative_depth(left, first_leaf(root, depth as u128)),
-                    ),
+                        relative_depth(n, first_leaf(root, depth as u128)),
+                    ))
                 };
 
-                let right = match self.map.get(&right) {
-                    Some(k) => *k,
-                    None => zero_hash(
-                        default,
-                        relative_depth(right, first_leaf(root, depth as u128)),
-                    ),
-                };
+                let left = get_or_insert(left);
+                let right = get_or_insert(right);
 
                 self.map.insert(parent, hash(&left, &right));
-                keys.push(parent);
+                keys.push(Reverse(parent));
             }
         }
     }
 
-    pub fn into_branch(mut self) -> Self {
+    pub fn trim(mut self) -> Self {
         for key in self.keys() {
             let (left, right) = children(key);
 
