@@ -1,10 +1,11 @@
-pub mod error;
 pub mod hash;
 
 use hash::{hash, zero_hash};
 
-use bonsai::{children, expand, first_leaf, last_leaf, relative_depth, subtree_index_to_general};
-use std::cmp::Reverse;
+use bonsai::{
+    children, expand, first_leaf, last_leaf, log2, relative_depth, subtree_index_to_general,
+};
+use std::cmp::{min, Reverse};
 use std::collections::{BTreeMap, BinaryHeap, HashSet};
 
 pub type K = u128;
@@ -43,7 +44,7 @@ impl Tree {
             .keys()
             .intersection(&self.leaf_keys(root, depth))
             .cloned()
-            // mapping to reverse turn this into a min-heap
+            // mapping to reverse turns this into a min-heap
             .map(Reverse)
             .collect();
 
@@ -88,6 +89,35 @@ impl Tree {
         for k in keys {
             let value = self.map.remove(&k).unwrap();
             self.map.insert(subtree_index_to_general(root, k), value);
+        }
+    }
+
+    pub fn insert_bytes(&mut self, rooted_at: K, bytes: Vec<u8>) {
+        let len = bytes.len() as K;
+        let padded_len = len
+            .checked_next_power_of_two()
+            .expect("compiled code to fit in tree");
+        let depth = log2(padded_len / 32);
+        let first: K = first_leaf(rooted_at, depth);
+
+        for i in (0..len).step_by(32) {
+            let begin = i as usize;
+            let end = min(i + 32, len) as usize;
+
+            let chunk_len = if i + 32 < len {
+                32
+            } else {
+                if end % 32 != 0 {
+                    end % 32
+                } else {
+                    32
+                }
+            };
+
+            let mut buf = [0u8; 32];
+            buf[0..chunk_len].copy_from_slice(&bytes[begin..end]);
+
+            self.map.insert(first + (i / 32), buf);
         }
     }
 }
