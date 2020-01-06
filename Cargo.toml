@@ -1,10 +1,10 @@
 [package]
 name = "arborist"
-version = "0.0.0"
+version = "0.0.1"
 authors = ["Matt Garnett <crates@garnett.dev>"]
 license = "MIT OR Apache-2.0"
 description = "A surgical tool for interacting with binary trees."
-repository = "https://github.com/lightclient/bonsai"
+repository = "https://github.com/lightclient/arborist"
 keywords = ["tree", "merkle"]
 categories = ["algorithms"]
 edition = "2018"
