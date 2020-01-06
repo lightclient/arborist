@@ -35,7 +35,7 @@ impl Tree {
         self.map.insert(key, val)
     }
 
-    fn keys(&self) -> HashSet<K> {
+    pub fn keys(&self) -> HashSet<K> {
         self.map.keys().cloned().collect()
     }
 
