@@ -31,6 +31,10 @@ impl Tree {
         self.map.get(key)
     }
 
+    pub fn insert(&mut self, key: K, val: V) -> Option<V> {
+        self.map.insert(key, val)
+    }
+
     fn keys(&self) -> HashSet<K> {
         self.map.keys().cloned().collect()
     }
