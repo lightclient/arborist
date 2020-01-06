@@ -27,6 +27,10 @@ impl Tree {
         Self { map }
     }
 
+    pub fn to_map(self) -> BTreeMap<K, V> {
+        self.map
+    }
+
     pub fn get(&self, key: &K) -> Option<&V> {
         self.map.get(key)
     }
