@@ -1,12 +1,17 @@
 [package]
 name = "arborist"
-version = "0.1.0"
-authors = ["Matt Garnett <matt.garnett@me.com>"]
+version = "0.0.0"
+authors = ["Matt Garnett <crates@garnett.dev>"]
+license = "MIT OR Apache-2.0"
+description = "A surgical tool for interacting with binary trees."
+repository = "https://github.com/lightclient/bonsai"
+keywords = ["tree", "merkle"]
+categories = ["algorithms"]
 edition = "2018"
 
 [dependencies]
 arrayref = "0.3.5"
-bonsai = { path = "../bonsai", default-features = false, features=["u128"] }
+bonsai = { version = "0.2.1", default-features = false, features=["u128"] }
 sha2 = "0.8.0"
 
 [dev-dependencies]
