@@ -5,8 +5,9 @@ use hash::{hash, zero_hash};
 use bonsai::{
     children, expand, first_leaf, last_leaf, log2, relative_depth, subtree_index_to_general,
 };
-use std::cmp::{min, Reverse};
-use std::collections::{BTreeMap, BinaryHeap, HashSet};
+use std::cmp::min;
+use std::collections::{BTreeMap, BTreeSet, BinaryHeap};
+use std::convert::From;
 
 pub type K = u128;
 pub type V = [u8; 32];
@@ -23,12 +24,14 @@ impl Tree {
         }
     }
 
-    pub fn from_map(map: BTreeMap<K, V>) -> Self {
-        Self { map }
-    }
+    pub fn to_subtree(mut self, root: K) -> Self {
+        self.map = self
+            .map
+            .into_iter()
+            .map(|(k, v)| (subtree_index_to_general(root, k), v))
+            .collect();
 
-    pub fn to_map(self) -> BTreeMap<K, V> {
-        self.map
+        self
     }
 
     pub fn get(&self, key: &K) -> Option<&V> {
@@ -39,24 +42,18 @@ impl Tree {
         self.map.insert(key, val)
     }
 
-    pub fn keys(&self) -> HashSet<K> {
+    pub fn keys(&self) -> BTreeSet<K> {
         self.map.keys().cloned().collect()
     }
 
-    fn leaf_keys(&self, root: K, depth: u32) -> HashSet<K> {
-        (first_leaf(root, depth as u128)..=last_leaf(root, depth as u128)).collect()
-    }
-
     pub fn fill_subtree(&mut self, root: K, depth: u32, default: &V) {
-        let mut keys: BinaryHeap<Reverse<u128>> = self
+        let mut keys: BinaryHeap<u128> = self
             .keys()
-            .intersection(&self.leaf_keys(root, depth))
+            .intersection(&self._leaf_keys(root, depth))
             .cloned()
-            // mapping to reverse turns this into a min-heap
-            .map(Reverse)
             .collect();
 
-        while let Some(Reverse(key)) = keys.pop() {
+        while let Some(key) = keys.pop() {
             if key <= root {
                 break;
             }
@@ -75,32 +72,17 @@ impl Tree {
                 let right = get_or_insert(right);
 
                 self.map.insert(parent, hash(&left, &right));
-                keys.push(Reverse(parent));
+                keys.push(parent);
             }
         }
     }
 
     pub fn trim(mut self) -> Self {
-        for key in self.keys() {
-            let (left, right) = children(key);
-
-            if self.map.contains_key(&left) || self.map.contains_key(&right) {
-                self.map.remove(&key);
-            }
-        }
-
+        self._trim();
         self
     }
 
-    pub fn set_root(&mut self, root: K) {
-        let keys = self.keys();
-        for k in keys {
-            let value = self.map.remove(&k).unwrap();
-            self.map.insert(subtree_index_to_general(root, k), value);
-        }
-    }
-
-    pub fn insert_bytes(&mut self, rooted_at: K, bytes: Vec<u8>) {
+    pub fn raw_insert_bytes(&mut self, rooted_at: K, bytes: Vec<u8>) {
         let len = bytes.len() as K;
         let padded_len = len
             .checked_next_power_of_two()
@@ -127,5 +109,49 @@ impl Tree {
 
             self.map.insert(first + (i / 32), buf);
         }
+    }
+
+    pub fn insert_bytes(&mut self, rooted_at: K, bytes: Vec<u8>) {
+        let len = bytes.len() as K;
+        let padded_len = len
+            .checked_next_power_of_two()
+            .expect("compiled code to fit in tree");
+        let depth = log2(padded_len / 32);
+
+        self.raw_insert_bytes(rooted_at, bytes);
+        self.fill_subtree(rooted_at, depth as u32, &[0; 32]);
+        self._trim();
+    }
+
+    pub fn insert_subtree(&mut self, rooted_at: K, tree: Tree) {
+        for (k, v) in tree.to_subtree(rooted_at).map {
+            self.insert(k, v);
+        }
+    }
+
+    fn _leaf_keys(&self, root: K, depth: u32) -> BTreeSet<K> {
+        (first_leaf(root, depth as u128)..=last_leaf(root, depth as u128)).collect()
+    }
+
+    fn _trim(&mut self) {
+        for key in self.keys() {
+            let (left, right) = children(key);
+
+            if self.map.contains_key(&left) || self.map.contains_key(&right) {
+                self.map.remove(&key);
+            }
+        }
+    }
+}
+
+impl From<Tree> for BTreeMap<K, V> {
+    fn from(tree: Tree) -> BTreeMap<K, V> {
+        tree.map
+    }
+}
+
+impl From<BTreeMap<K, V>> for Tree {
+    fn from(map: BTreeMap<K, V>) -> Tree {
+        Tree { map }
     }
 }
