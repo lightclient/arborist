@@ -1,10 +1,9 @@
 pub mod hash;
 
-use hash::{hash, zero_hash};
-
 use bonsai::{
     children, expand, first_leaf, last_leaf, log2, relative_depth, subtree_index_to_general,
 };
+use hash::{hash, zero_hash};
 use std::cmp::min;
 use std::collections::{BTreeMap, BTreeSet, BinaryHeap};
 use std::convert::From;
